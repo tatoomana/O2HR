@@ -4,11 +4,11 @@
     "status": "completed"
   },
   {
-    "content": "Phase 2: Get design guidelines (design_agent)",
+    "content": "Phase 2: Design guidelines (design_agent)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Backend (FastAPI) - serve files, downloads, zip, live validation endpoint",
+    "content": "Phase 2: Backend (FastAPI) - serve files, downloads, zip, live validation endpoint + path-traversal hardening",
     "status": "completed"
   },
   {
@@ -16,11 +16,11 @@
     "status": "completed"
   },
   {
-    "content": "Phase 2: End to End Testing using Testing Agent (backend + frontend)",
-    "status": "in_progress"
+    "content": "Phase 2: End to End Testing (iteration_1 99.5%, iteration_2 100% regression)",
+    "status": "completed"
   },
   {
-    "content": "Phase 2: Fix any issues found by testing agent",
-    "status": "pending"
+    "content": "Phase 2: Fix issues found by testing agent (path-traversal hardening) - verified",
+    "status": "completed"
   }
 ]
