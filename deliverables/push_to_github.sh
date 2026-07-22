@@ -52,13 +52,30 @@ fi
 git config user.email >/dev/null 2>&1 || git config user.email "devops@example.com"
 git config user.name  >/dev/null 2>&1 || git config user.name  "AI Stack"
 
-# ---- 2. stage core files ----------------------------------------------------
+# ---- 2. stage core files (explicit + verified) -----------------------------
 for f in "${CORE_FILES[@]}"; do
-  [[ -e "$f" ]] && git add "$f"
+  if [[ -e "$f" ]]; then
+    # -f (force) guarantees a stray ignore rule can never drop a core file.
+    git add -f -- "$f"
+  else
+    err "Expected core file '$f' not found in $SCRIPT_DIR - aborting."
+    exit 1
+  fi
 done
+# Explicit, per requirement: make sure init.sh is always staged.
+git add -f -- init.sh
 # Belt-and-suspenders: make sure a real .env is never committed.
 git rm --cached -q .env >/dev/null 2>&1 || true
-ok "Staged core DevOps files."
+# Verify every core file is actually staged; fail loudly if any is missing.
+missing=()
+for f in "${CORE_FILES[@]}"; do
+  git ls-files --cached --error-unmatch -- "$f" >/dev/null 2>&1 || missing+=("$f")
+done
+if (( ${#missing[@]} )); then
+  err "These core files failed to stage: ${missing[*]}"
+  exit 1
+fi
+ok "Staged & verified core DevOps files: ${CORE_FILES[*]}"
 
 # ---- 3. commit --------------------------------------------------------------
 if git diff --cached --quiet; then
