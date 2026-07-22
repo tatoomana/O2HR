@@ -1,26 +1,26 @@
 [
   {
-    "content": "Deliverables: reduce to core files only (removed validate_stack.py)",
+    "content": "Hotfix: verify init.sh generated in deliverables (present)",
     "status": "completed"
   },
   {
-    "content": "Deliverables: harden .gitignore (.env, .env.*, workspace/, .openhands-state/, .openhands/, .headroom/)",
+    "content": "Hotfix: verify .gitignore doesn't ignore init.sh (confirmed not ignored)",
     "status": "completed"
   },
   {
-    "content": "Deliverables: create push_to_github.sh (init, add core files, commit, push main) - tested against local bare remote",
+    "content": "Hotfix: harden push_to_github.sh (git add -f init.sh + staged-verification guard)",
     "status": "completed"
   },
   {
-    "content": "Deliverables: update README.md (removed dashboard refs, added Publish-to-GitHub section + file table)",
+    "content": "Hotfix: diagnose real cause (repo made by whole-project sync; init.sh lives at deliverables/init.sh)",
     "status": "completed"
   },
   {
-    "content": "Workspace: removed all dashboard code (backend + frontend reverted to clean template, endpoints gone)",
+    "content": "Hotfix: attempt push to user remote (blocked - no write credentials in sandbox)",
     "status": "completed"
   },
   {
-    "content": "Verify: bundle listing correct, push flow e2e, .env excluded, docker compose config passes, services healthy",
+    "content": "Hotfix: testing_agent verification (iteration_3, 5/5 pass)",
     "status": "completed"
   }
 ]
