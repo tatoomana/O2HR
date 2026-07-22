@@ -1,0 +1,157 @@
+# ==============================================================================
+# AI Stack  ·  OpenHands + Headroom
+# ------------------------------------------------------------------------------
+#  OpenHands : autonomous AI software engineer (spawns sandboxed dev containers)
+#  Headroom  : LLM proxy for caching / cost & latency optimization
+#
+#  This is a modern Compose Spec file. The top-level `version:` key is
+#  intentionally OMITTED because it is obsolete/deprecated in Docker Compose v2+.
+#
+#  Quick start:    ./init.sh  &&  docker compose up -d
+#
+#  Host port map (3000 and 4000 are FORBIDDEN and deliberately NOT bound):
+#     OpenHands UI  ->  http://localhost:5000   (container :3000)
+#     Headroom      ->  http://localhost:5001   (container :8787)
+# ==============================================================================
+
+name: ai-stack
+
+services:
+  # ===========================================================================
+  # OpenHands
+  # ---------------------------------------------------------------------------
+  # Runs "docker-OUTSIDE-of-docker": it talks to the HOST Docker daemon through
+  # the mounted socket and launches its sandbox as a *sibling* container on the
+  # host (NOT nested inside this container). Every reliability fix below exists
+  # because of that sibling-container model.
+  # ===========================================================================
+  openhands:
+    image: "docker.all-hands.dev/all-hands-ai/openhands:${OPENHANDS_VERSION:-0.53}"
+    container_name: openhands-app
+    restart: unless-stopped
+    pull_policy: always
+    stdin_open: true            # keep STDIN open for the interactive agent
+    tty: true
+
+    ports:
+      # HOST:CONTAINER  — host 5000 chosen because 3000/4000 are forbidden.
+      - "${OPENHANDS_HOST_PORT:-5000}:3000"
+
+    environment:
+      # ---- LLM (Z.AI GLM via LiteLLM) --------------------------------------
+      - "LLM_MODEL=${LLM_MODEL:-zai/glm-4.6}"
+      - "LLM_API_KEY=${LLM_API_KEY:?LLM_API_KEY is required — set it in .env}"
+      - "LLM_BASE_URL=${LLM_BASE_URL:-https://api.z.ai/api/paas/v4}"
+
+      # ---- Sandbox runtime -------------------------------------------------
+      # CRITICAL: the runtime image tag MUST match the OpenHands app version,
+      # or the sandbox fails to launch. Both are driven by OPENHANDS_VERSION.
+      - "SANDBOX_RUNTIME_CONTAINER_IMAGE=${SANDBOX_RUNTIME_CONTAINER_IMAGE:-docker.all-hands.dev/all-hands-ai/runtime:${OPENHANDS_VERSION:-0.53}-nikolaik}"
+      # Create workspace files as your host user (avoids root-owned files).
+      - "SANDBOX_USER_ID=${SANDBOX_USER_ID:-0}"
+
+      # ---- Workspace -------------------------------------------------------
+      # >>> THE #1 DIND FIX <<<
+      # WORKSPACE_BASE / WORKSPACE_MOUNT_PATH must both be the ABSOLUTE HOST
+      # path. The sandbox is a sibling container created on the host daemon, so
+      # it can only bind-mount a path that exists ON THE HOST. Passing a
+      # container-internal path here is the classic reason the sandbox "starts
+      # but the workspace is empty / fails". `./init.sh` fills these in for you.
+      - "WORKSPACE_BASE=${WORKSPACE_BASE:?run ./init.sh first to populate .env}"
+      - "WORKSPACE_MOUNT_PATH=${WORKSPACE_MOUNT_PATH:?run ./init.sh first to populate .env}"
+      - "LOG_ALL_EVENTS=true"
+      # ---- Modern alternative (OpenHands >= 0.39) --------------------------
+      # Newer releases prefer SANDBOX_VOLUMES over WORKSPACE_BASE. To switch,
+      # comment the two WORKSPACE_* lines above and uncomment the line below:
+      # - "SANDBOX_VOLUMES=${WORKSPACE_MOUNT_PATH}:/workspace:rw"
+
+    volumes:
+      # (1) Docker socket — lets OpenHands spawn sandbox containers on the host.
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      # (2) Persist OpenHands settings / conversations / state.
+      - "openhands-state:/.openhands"
+      # (3) Workspace bind mount: ABSOLUTE host path -> /opt/workspace_base.
+      - "${WORKSPACE_MOUNT_PATH:-./workspace}:/opt/workspace_base"
+
+    # ---- DIND NETWORKING FIX (Linux) ----------------------------------------
+    # Maps host.docker.internal to the host gateway so the app can reach the
+    # host and its spawned runtime container. Equivalent to the docker run flag
+    # `--add-host host.docker.internal:host-gateway`.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # ---- SOCKET PERMISSIONS FIX ---------------------------------------------
+    # Add the HOST docker group's GID (auto-detected by ./init.sh) so this
+    # container is allowed to use /var/run/docker.sock. This is the SECURE fix
+    # — we never `chmod 666` the socket.
+    group_add:
+      - "${DOCKER_GID:-999}"
+
+    # ---- PRIVILEGED MODE (intentionally OFF) --------------------------------
+    # OpenHands uses docker-OUTSIDE-of-docker (host socket), so privileged mode
+    # is NOT required and stays disabled for security. Enable ONLY if you run a
+    # true docker-in-docker host and know you need it:
+    # privileged: true
+    #
+    # Locked-down-host networking fallback (add under `environment:` and re-test
+    # ONE change at a time) if the app<->sandbox path is still blocked:
+    # - "SANDBOX_USE_HOST_NETWORK=true"
+
+    networks:
+      - ai-stack-network
+
+  # ===========================================================================
+  # Headroom  ·  LLM proxy (caching + cost/latency optimization)
+  # ===========================================================================
+  headroom:
+    image: "ghcr.io/chopratejas/headroom:${HEADROOM_VERSION:-latest}"
+    container_name: headroom-proxy
+    restart: unless-stopped
+    pull_policy: always
+    # Bind to 0.0.0.0 (NOT 127.0.0.1) so the port is reachable from the host.
+    command: ["headroom", "proxy", "--host", "0.0.0.0", "--port", "8787"]
+
+    ports:
+      # Host 5001 chosen because 3000/4000 are forbidden.
+      - "${HEADROOM_HOST_PORT:-5001}:8787"
+
+    environment:
+      - "HEADROOM_CONFIG_DIR=/root/.headroom/config"
+      - "HEADROOM_WORKSPACE_DIR=/root/.headroom"
+      # Optional: only used if you route model calls through Headroom.
+      - "LLM_API_KEY=${LLM_API_KEY:-}"
+
+    volumes:
+      # Persist Headroom config + local DB across restarts.
+      - "headroom-data:/root/.headroom"
+
+    # Advisory health check (non-blocking — nothing depends_on it). Tries python
+    # (always present in the image) then curl; a minimal image without either
+    # simply reports "unhealthy" while the proxy keeps serving traffic.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8787/health')\" || curl -fsS http://localhost:8787/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    networks:
+      - ai-stack-network
+
+# =============================================================================
+# Shared bridge network — lets the two services reach each other by name.
+# e.g. route OpenHands through Headroom with LLM_BASE_URL=http://headroom:8787
+# =============================================================================
+networks:
+  ai-stack-network:
+    name: ai-stack-network
+    driver: bridge
+
+# =============================================================================
+# Named volumes for persistence
+# =============================================================================
+volumes:
+  openhands-state:
+    name: openhands-state
+  headroom-data:
+    name: headroom-data

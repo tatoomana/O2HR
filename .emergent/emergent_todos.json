@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Phase 1: Create deliverables (docker-compose.yml, .env.example, init.sh, README.md) in /app/deliverables/",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: Write Python static-validation script (YAML parse + invariants)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: Run validations (python 42/42 + bash -n + authoritative docker compose config + init.sh e2e + fail-fast)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: Fix until all validations pass",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Get design guidelines (design_agent)",
+    "status": "in_progress"
+  },
+  {
+    "content": "Phase 2: Backend (FastAPI) - serve deliverable files, downloads, zip, self-check/validation endpoint",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Frontend (React) - dashboard: hero, architecture diagram, ports table, file viewer w/ highlight, copy/download, Fixes Applied, validation panel",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: All user stories covered in development",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: End to End Testing using Testing Agent",
+    "status": "pending"
+  }
+]

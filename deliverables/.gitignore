@@ -1,0 +1,9 @@
+# Never commit real secrets or local state
+.env
+
+# Local workspace mounted into OpenHands
+/workspace/
+
+# Editor / OS noise
+*.tmp
+.DS_Store
