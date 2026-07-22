@@ -236,12 +236,86 @@ class BackendTester:
             resp = requests.get(f"{self.api_url}/files/nonexistent.txt", timeout=10)
             self.test("Nonexistent file returns 404", resp.status_code == 404)
             
-            # Test path traversal protection
-            resp2 = requests.get(f"{self.api_url}/files/../../../etc/passwd", timeout=10)
-            self.test("Path traversal attempt returns 404", resp2.status_code == 404)
-            
         except Exception as e:
             self.test("404 handling", False, str(e))
+
+    def test_path_traversal_protection(self):
+        """Test comprehensive path traversal protection (REGRESSION FIX VERIFY)"""
+        self.log("\n=== Testing Path Traversal Protection (CRITICAL REGRESSION FIX) ===")
+        
+        # Test cases that MUST return 404 (not 200 or 500)
+        traversal_attempts = [
+            # Basic traversal patterns
+            ("../../../etc/passwd", "Basic traversal with ../../../"),
+            ("..\\..\\..\\windows\\system32", "Windows-style traversal"),
+            
+            # URL-encoded traversal (CRITICAL - mentioned in requirements)
+            ("..%2f..%2fetc%2fpasswd", "URL-encoded forward slash traversal"),
+            ("..%2F..%2Fetc%2Fpasswd", "URL-encoded uppercase traversal"),
+            ("..%5c..%5cwindows", "URL-encoded backslash traversal"),
+            
+            # Double encoding
+            ("..%252f..%252fetc%252fpasswd", "Double URL-encoded traversal"),
+            
+            # Names containing '..' in various positions
+            ("..docker-compose.yml", "Filename starting with .."),
+            ("docker..compose.yml", "Filename with .. in middle"),
+            ("docker-compose.yml..", "Filename ending with .."),
+            ("test..file", "Simple filename with .."),
+            
+            # Mixed patterns
+            ("./docker-compose.yml", "Relative path with ./"),
+            ("../docker-compose.yml", "Parent directory reference"),
+            ("docker-compose.yml/../init.sh", "Traversal in middle"),
+            
+            # Absolute paths
+            ("/etc/passwd", "Absolute path with /"),
+            ("/app/deliverables/docker-compose.yml", "Absolute path to valid file"),
+            
+            # Names with slashes or backslashes
+            ("subdir/docker-compose.yml", "Subdirectory with /"),
+            ("subdir\\docker-compose.yml", "Subdirectory with \\"),
+            
+            # Null byte injection attempts
+            ("docker-compose.yml%00.txt", "Null byte injection"),
+            
+            # Empty and whitespace
+            ("", "Empty filename"),
+            (" ", "Whitespace filename"),
+            ("   ", "Multiple spaces"),
+        ]
+        
+        for filename, description in traversal_attempts:
+            try:
+                # Use requests.get with allow_redirects=False to prevent following redirects
+                resp = requests.get(
+                    f"{self.api_url}/files/{filename}",
+                    timeout=10,
+                    allow_redirects=False
+                )
+                
+                # MUST be 404, not 200 (success) or 500 (server error) or 3xx (redirect)
+                is_404 = resp.status_code == 404
+                
+                if not is_404:
+                    detail = f"Got {resp.status_code} (expected 404) - {description}"
+                    if resp.status_code == 200:
+                        detail += " [SECURITY ISSUE: File accessible!]"
+                    elif resp.status_code >= 500:
+                        detail += " [Server error - should be 404]"
+                    elif 300 <= resp.status_code < 400:
+                        detail += f" [Redirect to: {resp.headers.get('Location', 'unknown')}]"
+                else:
+                    detail = f"Correctly blocked - {description}"
+                
+                self.test(
+                    f"Traversal blocked: {filename[:50]}{'...' if len(filename) > 50 else ''}",
+                    is_404,
+                    detail
+                )
+                
+            except Exception as e:
+                self.test(f"Traversal test: {filename[:30]}", False, f"Error: {str(e)}")
 
     def test_download_all(self):
         """Test GET /api/download-all returns valid zip"""
@@ -333,6 +407,7 @@ class BackendTester:
         self.test_individual_files()
         self.test_file_download()
         self.test_nonexistent_file()
+        self.test_path_traversal_protection()  # NEW: Comprehensive traversal tests
         self.test_download_all()
         self.test_validate()
         

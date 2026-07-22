@@ -97,12 +97,20 @@ class StatusCheckCreate(BaseModel):
 
 
 # ----------------------------- Helpers -----------------------------
+def _is_safe_name(name: str) -> bool:
+    """Reject anything not on the explicit whitelist or containing traversal."""
+    if not name or "/" in name or "\\" in name or ".." in name:
+        return False
+    return name in CATALOG_BY_NAME
+
+
 def _read_file(name: str) -> str:
-    if name not in CATALOG_BY_NAME:
+    if not _is_safe_name(name):
         raise HTTPException(status_code=404, detail=f"Unknown file: {name}")
-    path = DELIVERABLES_DIR / name
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail=f"File not found on disk: {name}")
+    # Resolve and confirm the path stays inside the deliverables directory.
+    path = (DELIVERABLES_DIR / name).resolve()
+    if DELIVERABLES_DIR not in path.parents or not path.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
     return path.read_text(encoding="utf-8")
 
 
@@ -349,6 +357,8 @@ async def list_files():
 @api_router.get("/files/{filename}")
 async def get_file(filename: str):
     """Return a single file's content + metadata."""
+    if not _is_safe_name(filename):
+        raise HTTPException(status_code=404, detail=f"Unknown file: {filename}")
     meta = CATALOG_BY_NAME.get(filename)
     if not meta:
         raise HTTPException(status_code=404, detail=f"Unknown file: {filename}")

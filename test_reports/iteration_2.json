@@ -1,0 +1,54 @@
+{
+  "summary": "Completed focused regression testing of backend path-traversal hardening fix. All 33 tests passed (100% success rate). The backend correctly blocks all path traversal attempts that reach the API with 404 responses. No regressions detected - all endpoints and functionality working as expected.",
+  
+  "backend_issues": {
+    "critical_bugs": [],
+    "minor_issues": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "Path Traversal Protection: All URL-encoded traversal attempts correctly blocked with 404 (..%2f..%2fetc%2fpasswd, ..%2F..%2Fetc%2Fpasswd, ..%5c..%5cwindows, double-encoded)",
+    "Path Traversal Protection: All filenames containing '..' correctly blocked with 404 (..docker-compose.yml, docker..compose.yml, docker-compose.yml.., test..file)",
+    "Path Traversal Protection: All absolute paths correctly blocked with 404 (/etc/passwd, /app/deliverables/docker-compose.yml)",
+    "Path Traversal Protection: All subdirectory attempts correctly blocked with 404 (subdir/file, subdir\\file)",
+    "Path Traversal Protection: Whitespace filenames correctly blocked with 404",
+    "No Regression: All 6 valid files still accessible (docker-compose.yml, .env.example, init.sh, README.md, .gitignore, validate_stack.py)",
+    "No Regression: docker-compose.yml contains all critical fixes (group_add ${DOCKER_GID, host.docker.internal:host-gateway, WORKSPACE_MOUNT_PATH, /var/run/docker.sock, ports 5000:3000 & 5001:8787, no version: key)",
+    "No Regression: GET /api/files returns 6 files with metadata",
+    "No Regression: GET /api/validate returns 18/18 passing checks (0 failed)",
+    "No Regression: GET /api/overview returns 2 services (OpenHands, Headroom) + 2 fixes (socket, dind)",
+    "No Regression: GET /api/download-all returns valid zip with 6 files",
+    "No Regression: GET /api/files/{name}/download returns attachment with correct headers",
+    "No Regression: GET /api/files/nonexistent.txt returns 404",
+    "Client-side URL normalization: Patterns like ../../../etc/passwd are normalized by HTTP client and hit SPA fallback (HTML), not the API - this is expected behavior and NOT a security issue"
+  ],
+  
+  "test_report_links": [
+    "/app/backend_regression_test.py",
+    "/app/verify_responses.py",
+    "/app/test_url_normalization.py"
+  ],
+  
+  "success_percentage": {
+    "backend": "100% (33/33 regression tests passed)",
+    "frontend": "Not tested (backend-only regression test as requested)",
+    "overall": "100%"
+  },
+  
+  "updated_files": [
+    "/app/backend_regression_test.py",
+    "/app/verify_responses.py",
+    "/app/test_url_normalization.py"
+  ],
+  
+  "action_item_for_main_agent": "",
+  
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}
