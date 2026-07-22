@@ -1,26 +1,26 @@
 [
   {
-    "content": "Phase 1: Create deliverables + static validation (42/42, compose config, init.sh e2e, fail-fast)",
+    "content": "Deliverables: reduce to core files only (removed validate_stack.py)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Design guidelines (design_agent)",
+    "content": "Deliverables: harden .gitignore (.env, .env.*, workspace/, .openhands-state/, .openhands/, .headroom/)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Backend (FastAPI) - serve files, downloads, zip, live validation endpoint + path-traversal hardening",
+    "content": "Deliverables: create push_to_github.sh (init, add core files, commit, push main) - tested against local bare remote",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Frontend (React) dashboard - hero, architecture, ports, fixes, file viewer, validation, quickstart",
+    "content": "Deliverables: update README.md (removed dashboard refs, added Publish-to-GitHub section + file table)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: End to End Testing (iteration_1 99.5%, iteration_2 100% regression)",
+    "content": "Workspace: removed all dashboard code (backend + frontend reverted to clean template, endpoints gone)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Fix issues found by testing agent (path-traversal hardening) - verified",
+    "content": "Verify: bundle listing correct, push flow e2e, .env excluded, docker compose config passes, services healthy",
     "status": "completed"
   }
 ]

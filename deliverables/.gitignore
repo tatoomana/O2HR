@@ -1,9 +1,22 @@
-# Never commit real secrets or local state
+# ==============================================================================
+# .gitignore for the OpenHands + Headroom Docker stack
+# ==============================================================================
+
+# ---- Secrets (NEVER commit real credentials) --------------------------------
 .env
+.env.*
+# ...but keep the template committed
+!.env.example
 
-# Local workspace mounted into OpenHands
-/workspace/
+# ---- Generated local state / runtime data -----------------------------------
+workspace/
+.openhands-state/
+.openhands/
+.headroom/
 
-# Editor / OS noise
-*.tmp
+# ---- OS / editor noise -------------------------------------------------------
 .DS_Store
+Thumbs.db
+*.tmp
+*.log
+*.swp

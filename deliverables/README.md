@@ -1,7 +1,8 @@
-# AI Stack — OpenHands + Headroom (Docker Compose)
+# AI Stack - OpenHands + Headroom (Docker Compose)
 
 A production-ready, **first-try-working** Docker Compose stack that runs two AI
-apps side by side on a shared network:
+apps side by side on a shared network. This repository is pure Infrastructure as
+Code - no application/build steps required.
 
 | Service   | What it does                                             | UI URL                  | Container port |
 |-----------|----------------------------------------------------------|-------------------------|----------------|
@@ -12,10 +13,23 @@ apps side by side on a shared network:
 
 ---
 
+## Repository contents
+
+| File                 | Purpose                                                                 |
+|----------------------|-------------------------------------------------------------------------|
+| `docker-compose.yml` | The stack definition (Compose Spec, no obsolete `version:` key).        |
+| `.env.example`       | All environment variables. Copy to `.env` (done for you by `init.sh`).  |
+| `init.sh`            | Idempotent host prep: workspace, docker GID, host paths -> writes `.env`.|
+| `.gitignore`         | Keeps `.env` and generated state (`workspace/`, `.openhands-state/`) out of git. |
+| `push_to_github.sh`  | One-command publish of this stack to your own GitHub repo.              |
+| `README.md`          | This file.                                                              |
+
+---
+
 ## Prerequisites
 
-- Docker Engine 20.10+ with the **Compose v2 plugin** (`docker compose`, not `docker-compose`).
-- Linux host recommended (Docker Desktop on macOS/Windows works — see notes below).
+- Docker Engine 20.10+ with the **Compose v2 plugin** (`docker compose`).
+- Linux host recommended (Docker Desktop on macOS/Windows works - see notes below).
 - A **GLM / Z.AI API key** (https://z.ai).
 
 ---
@@ -34,10 +48,10 @@ docker compose up -d
 ```
 
 Then open:
-- **OpenHands** → http://localhost:5000
-- **Headroom**  → http://localhost:5001
+- **OpenHands** -> http://localhost:5000
+- **Headroom**  -> http://localhost:5001
 
-Stop / view logs:
+Manage the stack:
 ```bash
 docker compose logs -f          # follow logs
 docker compose down             # stop (keeps named volumes)
@@ -46,21 +60,25 @@ docker compose down -v          # stop and delete persisted data
 
 ---
 
-## Files in this bundle
+## Publish to your own GitHub repository
 
-| File                 | Purpose                                                                 |
-|----------------------|-------------------------------------------------------------------------|
-| `docker-compose.yml` | The stack definition (Compose Spec, no obsolete `version:` key).        |
-| `.env.example`       | All environment variables. Copy to `.env` (done for you by `init.sh`).  |
-| `init.sh`            | Idempotent host prep: workspace, docker GID, host paths → writes `.env`. |
-| `.gitignore`         | Keeps `.env` and `./workspace` out of version control.                  |
-| `README.md`          | This file.                                                              |
+1. Create a new **empty** repository on GitHub (no README/license), and copy its URL.
+2. Run:
+
+```bash
+./push_to_github.sh https://github.com/<you>/ai-stack.git
+```
+
+The script runs `git init`, stages the core files, commits
+`feat: initial OpenHands + Headroom Docker stack`, and pushes to the `main`
+branch. Your secret `.env` is git-ignored and never pushed.
+
+> Uses HTTPS or SSH URLs. For HTTPS you may be prompted for a GitHub Personal
+> Access Token; for SSH ensure your key is added to GitHub.
 
 ---
 
 ## The two fixes that make this work first try
-
-These two issues are why the stack usually fails. Both are handled here.
 
 ### 1. Docker socket permissions (secure fix)
 OpenHands needs `/var/run/docker.sock` to spawn its sandbox. Instead of the
@@ -76,7 +94,7 @@ group_add:
 ### 2. Docker-in-Docker networking / workspace mount (the #1 killer)
 OpenHands runs **docker-outside-of-docker**: it uses the host daemon to create
 its sandbox as a **sibling container on the host**. That sandbox can only mount
-a path that exists **on the host filesystem** — not a path inside the OpenHands
+a path that exists **on the host filesystem** - not a path inside the OpenHands
 container. So `WORKSPACE_MOUNT_PATH` **must be an absolute host path**.
 `init.sh` computes it and writes it to `.env`. We also map the host gateway:
 
@@ -97,7 +115,7 @@ All config lives in `.env`. Key variables:
 | Variable                 | Default                             | Notes                                                   |
 |--------------------------|-------------------------------------|---------------------------------------------------------|
 | `LLM_API_KEY`            | _(required)_                        | Your GLM / Z.AI key.                                    |
-| `LLM_MODEL`              | `zai/glm-4.6`                       | LiteLLM model string (you asked for "GLM 5.2").         |
+| `LLM_MODEL`              | `zai/glm-4.6`                       | LiteLLM model string (set to your exact GLM model).     |
 | `LLM_BASE_URL`           | `https://api.z.ai/api/paas/v4`      | Use the China endpoint if applicable.                   |
 | `OPENHANDS_VERSION`      | `0.53`                              | Drives both app + runtime image tags.                   |
 | `OPENHANDS_HOST_PORT`    | `5000`                              | Host port for OpenHands UI.                             |
@@ -106,57 +124,44 @@ All config lives in `.env`. Key variables:
 | `DOCKER_GID`             | _(set by init.sh)_                  | Group owning `docker.sock`.                             |
 | `SANDBOX_USER_ID`        | _(set by init.sh)_                  | Your host uid, so workspace files are owned by you.     |
 
-### GLM model note
-You requested **"GLM 5.2"**. The currently available Z.AI coding model through
-LiteLLM is `zai/glm-4.6`, used as the default. Change `LLM_MODEL` in `.env` to
-your exact model id when it is available on your plan.
-
 ---
 
 ## Optional: route OpenHands through Headroom
 
 Both services share the `ai-stack-network` bridge, so they can reach each other
-by name. To send OpenHands' LLM traffic through the Headroom proxy (for caching
-/ cost savings), set in `.env`:
+by name. To send OpenHands' LLM traffic through the Headroom proxy, set in `.env`:
 
 ```bash
 LLM_BASE_URL=http://headroom:8787
 ```
 
-(Then configure Headroom with your upstream provider as per its docs.)
-
 ---
 
 ## Troubleshooting
 
-**`permission denied ... /var/run/docker.sock`**
-- Re-run `./init.sh` (it recomputes `DOCKER_GID`).
-- Confirm `docker ps` works as your user on the host.
-- Do **not** `chmod 666` the socket; `group_add` is the correct fix.
+**`permission denied ... /var/run/docker.sock`** - re-run `./init.sh` (it
+recomputes `DOCKER_GID`). Confirm `docker ps` works as your user. Do not
+`chmod 666` the socket.
 
-**Sandbox starts but the workspace is empty / runtime fails to mount**
-- This is the sibling-container path issue. Ensure `WORKSPACE_MOUNT_PATH` in
-  `.env` is an **absolute host path** (it will be, if you ran `./init.sh`).
+**Sandbox starts but workspace is empty** - ensure `WORKSPACE_MOUNT_PATH` in
+`.env` is an absolute host path (it will be, if you ran `./init.sh`).
 
-**`runtime image ... not found` / sandbox won't start**
-- App and runtime versions must match. Keep them driven by `OPENHANDS_VERSION`,
-  or set `SANDBOX_RUNTIME_CONTAINER_IMAGE` explicitly to the matching tag.
+**`runtime image ... not found`** - app and runtime versions must match; keep
+them driven by `OPENHANDS_VERSION`.
 
-**Port already in use**
-- Change `OPENHANDS_HOST_PORT` / `HEADROOM_HOST_PORT` in `.env` (never 3000/4000).
+**Port already in use** - change `OPENHANDS_HOST_PORT` / `HEADROOM_HOST_PORT`
+in `.env` (never 3000/4000).
 
-**macOS / Windows (Docker Desktop)**
-- The socket path is provided by Docker Desktop; `init.sh` falls back to
-  `DOCKER_GID=999`, which is correct for Docker Desktop VMs.
+**macOS / Windows (Docker Desktop)** - `init.sh` falls back to `DOCKER_GID=999`,
+which is correct for Docker Desktop VMs.
 
-**WSL2**
-- Run everything inside the WSL2 distro (not Windows paths) so the absolute
-  host workspace path resolves correctly.
+**WSL2** - run everything inside the WSL2 distro so the absolute host workspace
+path resolves correctly.
 
 ---
 
 ## Security notes
 - Secrets live only in `.env` (git-ignored). Never commit real keys.
-- Mounting the Docker socket grants root-equivalent host access to OpenHands —
+- Mounting the Docker socket grants root-equivalent host access to OpenHands -
   run this stack only on machines you trust.
-- Privileged mode is **disabled** by default (not needed for the socket model).
+- Privileged mode is disabled by default (not needed for the socket model).
